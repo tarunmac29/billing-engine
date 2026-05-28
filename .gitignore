@@ -31,3 +31,59 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+# ============================================================
+# PayCycle — .gitignore
+# GOLDEN RULE: Secrets, compiled files, IDE files kabhi
+# GitHub par mat bhejo.
+# ============================================================
+
+# ------ Maven build output ------
+target/
+*.jar
+*.war
+*.ear
+
+# ------ IDE files ------
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+*.swp
+*.swo
+
+# ------ OS files ------
+.DS_Store
+Thumbs.db
+
+# ------ Logs ------
+*.log
+logs/
+log/
+
+# ------ Environment / Secrets ------
+# YE SABSE IMPORTANT HAI — in files mein passwords hote hain
+.env
+.env.local
+.env.prod
+*.env
+
+# ------ Spring Boot local config overrides ------
+# application-local.yml mein apne machine ka config rakhna
+# ye file GitHub par nahi jayegi — safe!
+application-local.yml
+src/main/resources/application-local.yml
+
+# ------ Docker volumes (local data) ------
+mysql_data/
+redis_data/
+
+# ------ Test coverage reports ------
+/target/site/jacoco/
+
+# ------ SonarQube ------
+.sonar/
