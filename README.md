@@ -1,110 +1,152 @@
 # PayCycle — Enterprise-Grade Multi-Tenant Subscription & Automated Billing Engine
 
-PayCycle is a high-performance, resilient, and enterprise-ready multi-tenant subscription management and automated billing engine built using **Java 17, Spring Boot 3, and MySQL**.
+<p align="center">
+  <b>High-Performance Subscription Billing Infrastructure Built with Spring Boot</b>
+</p>
 
-The engine is architected to safely govern complex cyclic consumer payments, prevent duplicate financial charges using high-speed cryptographic idempotency layers, ensure event-driven data consistency via the **Transactional Outbox Pattern**, and enforce strict tenant-level data isolation.
-
----
-
-# 🚀 Key Features
-
-* Multi-tenant schema isolation
-* Subscription lifecycle state machine
-* Cryptographic idempotency protection
-* Transactional Outbox Pattern
-* Exponential backoff retry scheduler
-* JWT-based authentication & authorization
-* Fault-tolerant payment retry processing
-* Production-grade architecture patterns
-* Integration testing using Testcontainers
+<p align="center">
+  Java 17 • Spring Boot 3.3.2 • MySQL 8 • Redis 7 • JWT • Flyway • Testcontainers
+</p>
 
 ---
 
-# 🏗️ Core Architectural Features & Design Patterns
+# 🚀 Overview
 
-## 1. Multi-Tenant Schema Isolation
+PayCycle is a high-performance, resilient, and enterprise-grade multi-tenant subscription management and automated recurring billing engine built using **Java 17, Spring Boot 3.3.2, MySQL 8.0, and Redis 7**.
 
-To guarantee complete security and data privacy across enterprise boundaries, PayCycle employs a strict tenant partitioning strategy.
+The system is architected to safely manage complex recurring payment workflows, prevent duplicate financial transactions using cryptographic idempotency protection, guarantee distributed consistency through the **Transactional Outbox Pattern**, and enforce strict tenant-level data isolation for enterprise-scale SaaS platforms.
 
-### Highlights
+---
 
-* Every business workspace is mapped to a unique tenant.
-* All critical database entities are tenant-scoped.
-* Cross-tenant data access is blocked at the persistence layer.
-* Ensures strong enterprise-grade data isolation.
+# ✨ Core Features
+
+* 🔐 Zero-leak multi-tenant architecture
+* 💳 Automated recurring subscription billing
+* ⚡ Cryptographic idempotency protection
+* 🔄 Transactional Outbox Pattern
+* 🧠 Deterministic subscription state machine
+* 🚦 Optimistic & pessimistic locking strategies
+* 📦 Flyway-based schema migrations
+* 🧪 Integration testing with Testcontainers
+* 🔑 Stateless JWT authentication
+* 📈 Exponential retry & billing recovery logic
+* 🚀 Redis-backed distributed coordination
+
+---
+
+# 🏗️ Architecture & Design Patterns
+
+## 1. Zero-Leak Multi-Tenant Isolation
+
+PayCycle implements strict tenant-aware security boundaries across the entire request lifecycle.
+
+### Key Highlights
+
+* Every critical entity maps to a unique `Tenant`.
+* Tenant context is resolved during JWT authentication.
+* Cross-tenant data access is blocked globally.
+* Prevents accidental data leakage across organizations.
 
 ---
 
 ## 2. Deterministic Subscription State Machine
 
-Subscription lifecycle transitions are governed by a strict internal state machine to prevent invalid billing states.
+Subscription lifecycle transitions are protected through a guarded finite-state machine.
 
-### Supported Lifecycle Flow
+### Supported Workflow
 
 ```text
 TRIALING → ACTIVE → PAUSED → PAST_DUE → CANCELLED
 ```
 
-### Safety Mechanisms
+### Protection Rules
 
-* Invalid state transitions are blocked automatically.
-* Contract resurrection from `CANCELLED` requires a new billing setup.
-* Transition guards maintain transactional consistency.
+* Invalid transitions are rejected instantly.
+* Cancelled subscriptions cannot be reactivated directly.
+* All state mutations pass transactional validation guards.
 
 ---
 
-## 3. Cryptographic Idempotency Layer (Double-Charge Prevention)
+## 3. Cryptographic Idempotency Layer
 
-PayCycle protects billing infrastructure from:
+To eliminate duplicate payment processing caused by:
 
-* Rapid frontend multi-clicks
-* Network retries
-* Duplicate payment requests
+* Frontend multi-clicks
+* Retry storms
+* Network instability
 
-### Mechanism
+PayCycle introduces a SHA-256 based idempotency engine.
 
-The engine computes a deterministic SHA-256 signature using:
+### Signature Composition
 
 ```text
-Idempotency-Key + Tenant-ID + Payload JSON
+X-Idempotency-Key + Tenant-ID + Request Payload
 ```
 
-### Benefits
+### Engine Behavior
 
 * Duplicate requests return cached responses instantly.
-* Prevents accidental financial double-charging.
-* Improves API reliability under retry storms.
+* Payload mismatches with identical keys trigger:
+
+```http
+HTTP 422 Unprocessable Entity
+```
+
+* Prevents financial double-charging safely.
 
 ---
 
 ## 4. Transactional Outbox Pattern
 
-Instead of directly publishing events during business transactions, PayCycle uses the **Transactional Outbox Pattern**.
+To maintain distributed consistency between database transactions and external events:
 
-### Workflow
+### Atomic Workflow
 
-1. Business state changes are committed.
-2. Corresponding event records are stored in the outbox table.
-3. Background workers asynchronously process pending events.
+1. Business changes are persisted
+2. Matching outbox events are stored
+3. Background workers asynchronously publish events
 
-### Advantages
+### Benefits
 
-* Reliable event delivery
-* Eliminates distributed transaction issues
-* Prevents message loss
-* Improves microservice consistency
+* Prevents lost events
+* Guarantees eventual consistency
+* Eliminates distributed transaction failures
 
 ---
 
-## 5. Fault-Tolerant Exponential Backoff Scheduler
+## 5. Concurrency Control & Retry Resilience
 
-Failed payment retries use intelligent retry scheduling rather than fixed intervals.
+### Optimistic Locking
 
-### Retry Formula
+Used heavily for:
 
-[
-\text{Next Retry Interval} = 2^{\text{retryCount}} \text{ Days}
-]
+* Subscription state updates
+* Concurrent billing workflows
+
+```java
+@Version
+private Long version;
+```
+
+### Pessimistic Locking
+
+Used for:
+
+* Wallet mutations
+* Payment deduction flows
+* High-contention financial operations
+
+```sql
+SELECT * FROM wallet WHERE id=? FOR UPDATE;
+```
+
+---
+
+# 📈 Exponential Retry Strategy
+
+Failed invoice retries are scheduled dynamically using exponential backoff.
+
+\text{Next Retry Interval} = 2^{\text{retryCount}}\ \text{Days}
 
 ### Example
 
@@ -115,85 +157,90 @@ Failed payment retries use intelligent retry scheduling rather than fixed interv
 | 3             | 8 Days  |
 | 4             | 16 Days |
 
-### Failure Handling
-
-* Maximum retry limits are configurable per billing plan.
-* Subscriptions exceeding retry thresholds transition safely to `CANCELLED`.
+Subscriptions exceeding retry thresholds automatically transition into a `CANCELLED` state.
 
 ---
 
-# 🗺️ High-Level Architecture
+# 🗺️ High-Level Request Processing Pipeline
 
 ```text
-Client Request
+Incoming Request
        │
        ▼
-API Gateway / Controllers
+JWT Security Filter
        │
        ▼
-Authentication & JWT Validation
+Tenant Context Resolution
        │
        ▼
-Tenant Resolution Layer
+Idempotency Filter
        │
-       ▼
-Subscription Service Layer
-       │
-       ├── State Machine Validation
-       ├── Idempotency Verification
-       ├── Billing Processing
-       └── Retry Scheduling
-       │
-       ▼
-MySQL Transaction
-       │
-       ├── Domain Entity Persistence
-       └── Outbox Event Persistence
-       │
-       ▼
-Outbox Worker
-       │
-       ▼
-Webhook / Queue / Notification Delivery
+ ┌─────┴───────────┐
+ │                 │
+ ▼                 ▼
+Cache HIT      Cache MISS
+ │                 │
+ ▼                 ▼
+Return Cached   Core Business Logic
+Response             │
+                     ▼
+        Subscription State Machine
+                     │
+                     ▼
+             Billing Engine
+                     │
+                     ▼
+     Atomic Database Transaction
+      ├── Domain Changes
+      └── Outbox Event Insert
+                     │
+                     ▼
+        Async Outbox Publisher
+                     │
+                     ▼
+        External Queue/Webhook
 ```
 
 ---
 
 # 🛠️ Tech Stack
 
-| Category            | Technology            |
+| Layer               | Technology            |
 | ------------------- | --------------------- |
 | Language            | Java 17               |
-| Framework           | Spring Boot 3         |
+| Framework           | Spring Boot 3.3.2     |
+| Database            | MySQL 8.0             |
+| Cache & Locks       | Redis 7 + Redisson    |
 | ORM                 | Spring Data JPA       |
 | Security            | Spring Security + JWT |
-| Database            | MySQL 8               |
-| Build Tool          | Maven 3               |
+| Migration           | Flyway                |
 | Testing             | JUnit 5               |
 | Mocking             | Mockito               |
 | Assertions          | AssertJ               |
 | Integration Testing | Testcontainers        |
+| Build Tool          | Maven                 |
 
 ---
 
-# 📦 Project Structure
+# 📂 Project Structure
 
 ```text
 src
 ├── main
-│   ├── java
-│   │   └── com.paycycle
-│   │       ├── auth
-│   │       ├── billing
-│   │       ├── subscription
-│   │       ├── tenant
-│   │       ├── outbox
-│   │       ├── scheduler
-│   │       ├── idempotency
-│   │       ├── security
-│   │       └── common
+│   ├── java/com/paycycle
+│   │   ├── auth
+│   │   ├── billing
+│   │   ├── subscription
+│   │   ├── tenant
+│   │   ├── outbox
+│   │   ├── idempotency
+│   │   ├── scheduler
+│   │   ├── security
+│   │   └── common
+│   │
 │   └── resources
-│       └── application.yml
+│       ├── application.yml
+│       └── db/migration
 │
 └── test
     ├── integration
@@ -207,35 +254,49 @@ src
 ## 1. Clone Repository
 
 ```bash
-git clone https://github.com/yourusername/billing-engine.git
-cd billing-engine
+git clone https://github.com/yourusername/paycycle.git
+cd paycycle
 ```
 
 ---
 
-## 2. Start Dependencies via Docker
+## 2. Start Infrastructure Containers
 
 ```bash
-docker-compose up -d
+docker compose up -d
+```
+
+Verify running containers:
+
+```bash
+docker compose ps
 ```
 
 ---
 
-## 3. Configure Environment Variables
+## 3. Configure Application Properties
 
-Update `src/main/resources/application.yml`
+Update:
+
+```text
+src/main/resources/application.yml
+```
 
 ```yaml
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/paycycle_billing?useSSL=false&allowPublicKeyRetrieval=true
-    username: root
-    password: your_secure_password
+    url: jdbc:mysql://localhost:3306/paycycle_db?useSSL=false&allowPublicKeyRetrieval=true
+    username: paycycle_user
+    password: paycycle_pass
+
+    hikari:
+      pool-name: PayCycle-HikariPool-Dev
+      maximum-pool-size: 15
 
   jpa:
     hibernate:
       ddl-auto: validate
-    show-sql: false
+
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL8Dialect
@@ -243,31 +304,29 @@ spring:
 
 ---
 
-## 4. Build the Project
+## 4. Build & Run Application
 
 ```bash
-mvn clean package -DskipTests
+mvn clean compile spring-boot:run
+```
+
+Expected startup log:
+
+```text
+Flyway: Successfully applied migration to schema 'paycycle_db'
 ```
 
 ---
 
-## 5. Run the Application
+# 🧪 Testing
 
-```bash
-mvn spring-boot:run
-```
-
----
-
-# 🧪 Running Tests
-
-## Execute Complete Test Suite
+## Run Complete Test Suite
 
 ```bash
 mvn test
 ```
 
-## Run Specific Unit Tests
+## Run Specific Components
 
 ```bash
 mvn test -Dtest="SubscriptionServiceTest,BillingCycleServiceTest,IdempotencyServiceTest"
@@ -277,14 +336,9 @@ mvn test -Dtest="SubscriptionServiceTest,BillingCycleServiceTest,IdempotencyServ
 
 # 🔐 Authentication
 
-PayCycle uses JWT-based authentication.
+PayCycle uses stateless JWT authentication.
 
-### Authentication Flow
-
-1. Register tenant admin
-2. Login with credentials
-3. Receive JWT token
-4. Attach token in protected API requests
+### Authorization Header
 
 ```http
 Authorization: Bearer <jwt-token>
@@ -292,43 +346,32 @@ Authorization: Bearer <jwt-token>
 
 ---
 
-# 🛣️ REST API Endpoints
+# 🌐 Core REST APIs
 
-| Method | Endpoint                            | Description                | Auth Required |
-| ------ | ----------------------------------- | -------------------------- | ------------- |
-| POST   | `/api/v1/auth/register`             | Register new tenant admin  | ❌             |
-| POST   | `/api/v1/auth/login`                | Generate JWT token         | ❌             |
-| POST   | `/api/v1/subscriptions`             | Create new subscription    | ✅             |
-| POST   | `/api/v1/subscriptions/{id}/pause`  | Pause active subscription  | ✅             |
-| POST   | `/api/v1/subscriptions/{id}/resume` | Resume paused subscription | ✅             |
-| DELETE | `/api/v1/subscriptions/{id}`        | Cancel subscription        | ✅             |
+| Method | Endpoint                            | Description           | Security         |
+| ------ | ----------------------------------- | --------------------- | ---------------- |
+| POST   | `/api/v1/auth/register`             | Register tenant owner | Public           |
+| POST   | `/api/v1/auth/login`                | Generate JWT token    | Public           |
+| POST   | `/api/v1/subscriptions`             | Create subscription   | JWT + Idempotent |
+| POST   | `/api/v1/subscriptions/{id}/pause`  | Pause subscription    | JWT              |
+| POST   | `/api/v1/subscriptions/{id}/resume` | Resume subscription   | JWT              |
+| DELETE | `/api/v1/subscriptions/{id}`        | Cancel subscription   | JWT              |
 
 ---
 
-# 🔄 Idempotent Request Example
+# 🔄 Idempotent API Example
 
 ```http
 POST /api/v1/subscriptions
-Idempotency-Key: 91c7bcb2-24c7-45f2
-Tenant-ID: tenant_alpha
+
+X-Idempotency-Key: 2f3f4c12-7ab2-49aa
+Authorization: Bearer <jwt-token>
 ```
 
-Duplicate requests with identical payloads automatically return the cached response without reprocessing payment logic.
+If the same request is retried with the same payload:
 
----
-
-# 📈 Scalability Considerations
-
-PayCycle is designed for horizontal scalability and cloud-native deployment.
-
-### Supported Enterprise Patterns
-
-* Stateless service instances
-* Async event processing
-* Background schedulers
-* Retry-safe APIs
-* Tenant-aware partitioning
-* Containerized deployments
+* Cached response is returned
+* Billing engine is NOT triggered twice
 
 ---
 
@@ -336,24 +379,24 @@ PayCycle is designed for horizontal scalability and cloud-native deployment.
 
 * Clean Architecture
 * SOLID Principles
-* Domain-Driven Design (DDD)
-* Event-Driven Architecture
+* Event-Driven Design
+* Domain-Oriented Service Boundaries
 * Fail-Safe Distributed Systems
-* Transactional Integrity
-* High Cohesion & Loose Coupling
+* High Cohesion & Low Coupling
+* Infrastructure Resilience Patterns
 
 ---
 
 # 🚀 Future Enhancements
 
-* Kafka/RabbitMQ integration
-* Stripe/Razorpay adapters
-* Distributed rate limiting
-* Metrics & observability dashboards
-* OpenTelemetry tracing
+* Kafka / RabbitMQ integration
+* Stripe & Razorpay payment adapters
+* OpenTelemetry distributed tracing
+* Prometheus + Grafana monitoring
 * Kubernetes deployment manifests
-* GraphQL APIs
-* Multi-region failover support
+* API rate limiting
+* Multi-region failover replication
+* Saga orchestration support
 
 ---
 
@@ -361,17 +404,17 @@ PayCycle is designed for horizontal scalability and cloud-native deployment.
 
 Contributions are welcome.
 
-### Development Workflow
+### Contribution Flow
 
-1. Fork the repository
-2. Create a feature branch
+1. Fork repository
+2. Create feature branch
 3. Commit changes
 4. Push branch
 5. Open pull request
 
 ---
 
-# 📄 License
+# 🛡️ License
 
 This project is licensed under the MIT License.
 
@@ -379,4 +422,4 @@ This project is licensed under the MIT License.
 
 # 👨‍💻 Author
 
-Developed with enterprise architecture principles using Spring Boot, distributed systems patterns, and resilient billing infrastructure concepts.
+Built with enterprise-grade distributed systems architecture principles using Spring Boot, resilient billing workflows, and modern backend infrastructure patterns.
