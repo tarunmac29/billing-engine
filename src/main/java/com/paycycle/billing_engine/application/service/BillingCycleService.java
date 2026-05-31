@@ -196,13 +196,26 @@ public class BillingCycleService {
         return invoiceRepository.save(invoice);
     }
 
+    // private boolean simulatePayment(Subscription subscription, Invoice invoice) {
+    //     // TODO Phase 4: Real Stripe/Razorpay gateway call
+    //     // Abhi 90% success simulate kar rahe hain
+    //     boolean success = Math.random() > 0.1;
+    //     log.info("Payment simulation for {}: {}", invoice.getId(),
+    //         success ? "SUCCESS" : "FAILED");
+    //     return success;
+    // }
+
     private boolean simulatePayment(Subscription subscription, Invoice invoice) {
-        // TODO Phase 4: Real Stripe/Razorpay gateway call
-        // Abhi 90% success simulate kar rahe hain
-        boolean success = Math.random() > 0.1;
-        log.info("Payment simulation for {}: {}", invoice.getId(),
-            success ? "SUCCESS" : "FAILED");
-        return success;
+    // TODO Phase 4: Real Stripe/Razorpay gateway call
+    boolean success = simulatePaymentForTest();
+    log.info("Payment simulation for {}: {}", invoice.getId(),
+        success ? "SUCCESS" : "FAILED");
+    return success;
+}
+
+    // Test ke liye — spy se override kar sakte hain
+    public boolean simulatePaymentForTest() {
+        return Math.random() > 0.1;
     }
 
     private void handlePaymentSuccess(Subscription subscription, Invoice invoice) {
