@@ -1,0 +1,107 @@
+
+
+# ============================================================
+# PayCycle — Local Development Services
+# ============================================================
+# Chalane ke liye:  docker compose up -d
+# Band karne ke liye: docker compose down
+# Logs dekhne ke liye: docker compose logs -f mysql
+# ============================================================
+
+services:
+
+  # ----------------------------------------------------------
+  # MySQL 8 — Primary Database
+  # ----------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: paycycle_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root123          # sirf local dev ke liye
+      MYSQL_DATABASE: paycycle_db
+      MYSQL_USER: paycycle_user
+      MYSQL_PASSWORD: paycycle_pass
+    ports:
+      - "3306:3306"                         # localhost:3306 → container:3306
+    volumes:
+      - mysql_data:/var/lib/mysql           # data persist hoga container restart par
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --default-authentication-plugin=mysql_native_password
+      --innodb-buffer-pool-size=256M
+      --max-connections=200
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot123"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------
+  # Redis 7 — Cache + Idempotency Keys + Distributed Locks
+  # ----------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: paycycle_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"                         # localhost:6379 → container:6379
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes  # data disk par save hoga
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ----------------------------------------------------------
+  # phpMyAdmin — MySQL ka GUI (browser mein database dekho)
+  # Browser mein jao: http://localhost:8081
+  # Login: paycycle_user / paycycle_pass
+  # ----------------------------------------------------------
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: paycycle_phpmyadmin
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: paycycle_user
+      PMA_PASSWORD: paycycle_pass
+    ports:
+      - "8081:80"
+
+  # ----------------------------------------------------------
+  # Redis Commander — Redis ka GUI (browser mein keys dekho)
+  # Browser mein jao: http://localhost:8082
+  # ----------------------------------------------------------
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: paycycle_redis_ui
+    restart: unless-stopped
+    depends_on:
+      - redis
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - "8082:8081"
+
+# ============================================================
+# Volumes — Data yahan store hoga
+# ============================================================
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# ============================================================
+# Network — sab services ek private network par hain
+# ============================================================
+networks:
+  default:
+    name: paycycle_network
